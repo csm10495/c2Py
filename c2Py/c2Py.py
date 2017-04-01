@@ -9,6 +9,7 @@ Author(s):
 import argparse
 import os
 import re
+import time
 
 from pprint import pprint
 
@@ -31,7 +32,8 @@ def printDict(d):
 
 def typeToCtypeLine(theTypeStr):
     '''
-    Returns a string of a ctype/struct item declaration from a line of C-Structure declaration.
+    Brief:
+        Returns a string of a ctype/struct item declaration from a line of C-Structure declaration.
     '''
     theTypeStr = theTypeStr.replace(';', '').strip()
     if ':' in theTypeStr:
@@ -121,6 +123,13 @@ def removeComments(fileText):
     # TODO
     return fileText
 
+def getAnonName():
+    '''
+    Brief:
+        Gets a anon-safe name for a struct
+    '''
+    return '_Anon_%s' % str(time.time()).replace('.', '_')
+
 def findStructures(fileLocation=None, fileText=None):
     '''
     Brief:
@@ -134,7 +143,7 @@ def findStructures(fileLocation=None, fileText=None):
 
     if fileLocation:
         if not os.path.isfile(fileLocation):
-            print ("file not found: %s" % fileLocation)
+            raise Exception("file not found: %s" % fileLocation)
             return False
 
         with open(fileLocation, 'r') as f:
@@ -148,7 +157,10 @@ def findStructures(fileLocation=None, fileText=None):
     for regex in REGEX_STRUCT_LIST:
         for match in regex.finditer(fileText):
             startIndex = match.start()
-            structName = match.groups()[0]
+            structName = match.groups()[0].strip()
+            structText = ""
+            if len(structName) == 0:
+                structName = getAnonName()
 
             if structName in structuresAsText:
                 raise Exception("Structure with name: %s is already in structuresAsText!" % structName)
@@ -172,10 +184,43 @@ def findStructures(fileLocation=None, fileText=None):
 
             structuresAsText[structName] = structText
 
-            # Remove this structText from the file to not duplicate
-            fileText = fileText.replace(structText, "")
+            # Remove this structText from the file to not duplicate, though keep the same text length
+            fileText = fileText.replace(structText, " " * len(structText))
 
     return structuresAsText
+
+def cStructHeaderToPy(headerLine, nameOverride=None):
+    '''
+    Brief:
+        Converts a header line of a struct to ctypes. Also includes the _pack_ and _fields_. 
+            Includes % modifier to input fields
+                If nameOverride is given, use this as the name instead of looking in the struct for it
+    '''
+    if nameOverride:
+        name = nameOverride
+    else:
+        name = headerLine.replace('typedef', '').replace("{", "").replace("struct", "").strip()
+
+    # TODO : what if it isn't pack 1?
+    headerPy = 'class %s(Structure):\n    _pack_ = 1\n    _fields_ = [\n%%s    ]' % name
+    return headerPy
+
+def cStructToPy(fileText, nameOverride=None):
+    '''
+    Brief:
+        Converts the given struct text to a python ctype struct text
+            If nameOverride is given, use this as the name instead of looking in the struct for it
+    '''
+    fileTextLines = fileText.replace(';','').splitlines()
+    firstLine = fileTextLines[0]
+    lastLine = fileTextLines[-1]
+    structFields = map(str.strip, fileTextLines[1:-1])
+    cStructText = cStructHeaderToPy(firstLine, nameOverride)
+    fieldText = ""
+    for fieldLine in structFields:
+        fieldText += ' ' * 8 + typeToCtypeLine(fieldLine) + "\n"
+
+    return cStructText % fieldText
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -187,15 +232,11 @@ if __name__ == '__main__':
     if not structuresAsText:
         sys.exit(1)
 
-    if args.debug:
-        printDict(structuresAsText)
-
-        for i in structuresAsText:
-            for line in structuresAsText[i].splitlines():
-                try:
-                    print (typeToCtypeLine(line))
-                except Exception as ex:
-                    pass
+    for key, value in structuresAsText.items():
+        print (key)
+        print (value)
+        print (cStructToPy(value, key))
+        print ("-" * 40)
 
 
 

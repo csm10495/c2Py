@@ -13,16 +13,19 @@ int main()
 	return 1;
 }
 
+struct a {
+	byte c;
+	byte d;
+};
+
 typedef struct s {
 	byte a[3];
 	unsigned int b : 4;
-	struct {
-		byte c;
-		byte d;
-	};
 }s;
 
-struct a{
-	byte c;
-	byte d;
+
+// TODO move this inside an existing struct to work on nesting
+struct {
+	byte e;
+	byte f;
 };
