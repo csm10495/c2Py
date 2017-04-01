@@ -7,6 +7,7 @@ Author(s):
 '''
 
 import argparse
+import collections
 import os
 import re
 import time
@@ -20,6 +21,10 @@ REGEX_STRUCT_LIST = [REGEX_STRUCT_1, REGEX_STRUCT_2]
 
 REGEX_ARRAY = re.compile(r'\[(\w*)\]')
 
+REGEX_ALIAS_1 = re.compile(r'typedef\s*(.*);')
+REGEX_ALIAS_2 = re.compile(r'#define\s*(.*)')
+REGEX_ALIAS_LIST = [REGEX_ALIAS_1, REGEX_ALIAS_2]
+
 def printDict(d):
     '''
     Brief:
@@ -30,11 +35,12 @@ def printDict(d):
         print(d[i])
         print("")
 
-def typeToCtypeLine(theTypeStr):
+def typeToCtypeLine(theTypeStr, aliases):
     '''
     Brief:
         Returns a string of a ctype/struct item declaration from a line of C-Structure declaration.
     '''
+    theTypeStr = replaceAliases(aliases=aliases, fileText=theTypeStr)
     theTypeStr = theTypeStr.replace(';', '').strip()
     if ':' in theTypeStr:
         # bitField
@@ -103,6 +109,8 @@ def typeToCtypeLine(theTypeStr):
         cType = 'c_ssize_t'
     elif theTypeStr == 'long double':
         cType = 'c_longdouble'
+    elif theTypeStr == 'unsigned char':
+        cType = 'c_ubyte'
     else:
         # Todo: look for type above this line in the source
         raise Exception("Unknown type given: %s" % theTypeStr)
@@ -135,19 +143,7 @@ def findStructures(fileLocation=None, fileText=None):
     Brief:
         Returns a dictionary of name to text for structures directly in the given file or text
     '''
-    if fileText is None and fileLocation is None:
-        raise Exception("fileLocation and fileText cannot both be None")
-
-    if fileText is not None and fileLocation is not None:
-        raise Exception("Do not provide both fileLocation and fileText")
-
-    if fileLocation:
-        if not os.path.isfile(fileLocation):
-            raise Exception("file not found: %s" % fileLocation)
-            return False
-
-        with open(fileLocation, 'r') as f:
-            fileText = f.read()
+    fileText = _getFileText(fileLocation, fileText)
 
     # remove comments
     fileText = removeComments(fileText)
@@ -205,7 +201,7 @@ def cStructHeaderToPy(headerLine, nameOverride=None):
     headerPy = 'class %s(Structure):\n    _pack_ = 1\n    _fields_ = [\n%%s    ]' % name
     return headerPy
 
-def cStructToPy(fileText, nameOverride=None):
+def cStructToPy(fileText, aliases, nameOverride=None):
     '''
     Brief:
         Converts the given struct text to a python ctype struct text
@@ -218,9 +214,62 @@ def cStructToPy(fileText, nameOverride=None):
     cStructText = cStructHeaderToPy(firstLine, nameOverride)
     fieldText = ""
     for fieldLine in structFields:
-        fieldText += ' ' * 8 + typeToCtypeLine(fieldLine) + "\n"
+        fieldText += ' ' * 8 + typeToCtypeLine(fieldLine, aliases) + "\n"
 
     return cStructText % fieldText
+
+def _getFileText(fileLocation=None, fileText=None):
+    '''
+    Brief:
+        Helper to get fileText from fileLocation or fileText
+    '''
+    if fileText is None and fileLocation is None:
+        raise Exception("fileLocation and fileText cannot both be None")
+
+    if fileText is not None and fileLocation is not None:
+        raise Exception("Do not provide both fileLocation and fileText")
+
+    if fileLocation:
+        if not os.path.isfile(fileLocation):
+            raise Exception("file not found: %s" % fileLocation)
+            return False
+
+        with open(fileLocation, 'r') as f:
+            fileText = f.read()
+    return fileText
+
+def getTypeAliases(fileLocation=None, fileText=None):
+    '''
+    Brief:
+        Searches the file text looking for aliases
+            Looks for typedefs and #defines
+    '''
+    fileText = _getFileText(fileLocation, fileText)
+
+    # this becomes that
+    aliases = collections.OrderedDict()
+    for regex in REGEX_ALIAS_LIST:
+        for matchText in regex.findall(fileText):
+            # typedefs are opposite the order of #defines
+            flipOrder = regex.pattern.startswith('typedef')
+            matchTextSplit = matchText.split()
+            if flipOrder:
+                aliases[matchTextSplit[-1]] = ' '.join(matchTextSplit[:-1])
+            else:
+                aliases[matchTextSplit[0]] = ' '.join(matchTextSplit[1:])
+
+    return aliases
+
+def replaceAliases(aliases, fileLocation=None, fileText=None):
+    '''
+    Brief:
+        Replaces known aliases and returns the updated fileText
+    '''
+    fileText = _getFileText(fileLocation, fileText)
+    for key, value in aliases.items():
+        fileText = fileText.replace(key, value)
+
+    return fileText
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -228,6 +277,7 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--debug", help="Debug flag", action='store_true')
     args = parser.parse_args()
 
+    aliases = getTypeAliases(fileLocation=args.file)
     structuresAsText = findStructures(fileLocation=args.file)
     if not structuresAsText:
         sys.exit(1)
@@ -235,7 +285,7 @@ if __name__ == '__main__':
     for key, value in structuresAsText.items():
         print (key)
         print (value)
-        print (cStructToPy(value, key))
+        print (cStructToPy(fileText=value, nameOverride=key, aliases=aliases))
         print ("-" * 40)
 
 

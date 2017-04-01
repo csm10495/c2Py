@@ -4,8 +4,9 @@
 #include <iostream>
 #include <string>
 
-typedef char CHAR
-typedef unsigned char BYTE
+typedef char CHAR;
+typedef unsigned char BYTE;
+#define MYTYPE int
 
 int main()
 {
@@ -14,8 +15,8 @@ int main()
 }
 
 struct a {
-	byte c;
-	byte d;
+	CHAR c;
+	BYTE d;
 };
 
 typedef struct s {
@@ -26,6 +27,7 @@ typedef struct s {
 
 // TODO move this inside an existing struct to work on nesting
 struct {
-	byte e;
-	byte f;
+	byte e : 4;
+	byte f : 4;
+	MYTYPE g;
 };
