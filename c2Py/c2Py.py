@@ -3,7 +3,7 @@ Brief:
     c2Py.py - A script to convert C-Structures to Python ctypes
 
 Author(s):
-    Charles Machalow
+    Charles Machalow - MIT License
 '''
 
 import argparse
