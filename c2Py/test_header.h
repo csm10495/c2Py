@@ -32,7 +32,7 @@ typedef union u {
 
 // TODO move this inside an existing struct to work on nesting
 struct {
-	byte e : 4;
-	byte f : 4;
+	byte e : BITS_FOR_E;
+	byte f : 8 - BITS_FOR_E;
 	MYTYPE g;
 };

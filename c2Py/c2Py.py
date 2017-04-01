@@ -301,10 +301,20 @@ def replaceAliases(aliases, fileLocation=None, fileText=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--file", help="File to try to convert the given structures to ctypes", required=True)
+    parser.add_argument("-la", "--list_aliases", help="List of aliases delimited by semicolons (use to define #defines) for example: DEBUG=3;WORK_LVL=2", type=str, required=False)
     parser.add_argument("-d", "--debug", help="Debug flag", action='store_true')
     args = parser.parse_args()
 
     aliases = getTypeAliases(fileLocation=args.file)
+
+    # Add specified aliases / #defines
+    if args.list_aliases:
+        for oneAlias in args.list_aliases.split(";"):
+            left, right = map(str.strip, oneAlias.split("="))
+
+            # Note that I'm not checking for an override here. Overrides are allowed.
+            aliases[left] = right
+
     structuresAsText = findStructures(fileLocation=args.file)
     if not structuresAsText:
         sys.exit(1)

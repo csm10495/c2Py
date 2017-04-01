@@ -14,7 +14,7 @@
     <RootNamespace>c2Py</RootNamespace>
     <IsWindowsApplication>False</IsWindowsApplication>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>-f test_header.h -d</CommandLineArguments>
+    <CommandLineArguments>-f test_header.h -d -la "BITS_FOR_E=2"</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
     <InterpreterArguments>-i</InterpreterArguments>
   </PropertyGroup>
