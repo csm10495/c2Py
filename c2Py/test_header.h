@@ -17,12 +17,17 @@ int main()
 struct a {
 	CHAR c;
 	BYTE d;
-};
+} ;
 
 typedef struct s {
 	byte a[3];
 	unsigned int b : 4;
-}s;
+}_s, *Ps;
+
+typedef union u {
+	byte a[4];
+	long b;
+}u;
 
 
 // TODO move this inside an existing struct to work on nesting

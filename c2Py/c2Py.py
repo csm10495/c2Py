@@ -8,6 +8,7 @@ Author(s):
 
 import argparse
 import collections
+import ctypes
 import os
 import re
 import time
@@ -15,8 +16,8 @@ import time
 from pprint import pprint
 
 # Matching braces finders
-REGEX_STRUCT_1 = re.compile(r'typedef\s*struct\s*(\w*)\s*{', re.DOTALL | re.MULTILINE)
-REGEX_STRUCT_2 = re.compile(r'struct\s*(\w*)\s*{', re.DOTALL | re.MULTILINE)
+REGEX_STRUCT_1 = re.compile(r'typedef\s*(struct|union)\s*(\w*)\s*{', re.DOTALL | re.MULTILINE)
+REGEX_STRUCT_2 = re.compile(r'(struct|union)\s*(\w*)\s*{', re.DOTALL | re.MULTILINE)
 REGEX_STRUCT_LIST = [REGEX_STRUCT_1, REGEX_STRUCT_2]
 
 REGEX_ARRAY = re.compile(r'\[(\w*)\]')
@@ -58,62 +59,67 @@ def typeToCtypeLine(theTypeStr, aliases):
 
     theName = theTypeStr.split()[-1].split("[")[0].strip()
     theTypeStr = ' '.join(theTypeStr.split()[:-1])
+    
+    theTypeStrLower = theTypeStr.lower() # going lower here to catch LONGLONG which isn't in wintypes for some reason
 
-    if theTypeStr == 'bool':
+    if theTypeStrLower == 'bool':
         cType = 'c_bool'
-    elif theTypeStr == 'int':
+    elif theTypeStrLower == 'int':
         cType = 'c_int'
-    elif theTypeStr == 'long':
+    elif theTypeStrLower == 'long':
         cType = 'c_long'
-    elif theTypeStr == 'longlong':
+    elif theTypeStrLower == 'longlong':
         cType = 'c_longlong'
-    elif theTypeStr == 'unsigned int':
+    elif theTypeStrLower == 'unsigned int':
         cType = 'c_uint'
-    elif theTypeStr == 'unsigned long':
+    elif theTypeStrLower == 'unsigned long':
         cType = 'c_ulong'
-    elif theTypeStr == 'unsigned longlong':
+    elif theTypeStrLower == 'unsigned longlong':
         cType = 'c_ulonglong'
-    elif theTypeStr == 'char':
+    elif theTypeStrLower == 'char':
         cType = 'c_char'
-    elif theTypeStr == 'int8_t':
+    elif theTypeStrLower == 'int8_t':
         cType = 'c_int8'
-    elif theTypeStr == 'int16_t':
+    elif theTypeStrLower == 'int16_t':
         cType = 'c_int16'
-    elif theTypeStr == 'int32_t':
+    elif theTypeStrLower == 'int32_t':
         cType = 'c_int32'
-    elif theTypeStr == 'int64_t':
+    elif theTypeStrLower == 'int64_t':
         cType = 'c_int64'
-    elif theTypeStr == 'uint8_t':
+    elif theTypeStrLower == 'uint8_t':
         cType = 'c_uint8'
-    elif theTypeStr == 'uint16_t':
+    elif theTypeStrLower == 'uint16_t':
         cType = 'c_uint16'
-    elif theTypeStr == 'uint32_t':
+    elif theTypeStrLower == 'uint32_t':
         cType = 'c_uint32'
-    elif theTypeStr == 'uint64_t':
+    elif theTypeStrLower == 'uint64_t':
         cType = 'c_uint64'
-    elif theTypeStr == 'ubyte':
+    elif theTypeStrLower == 'ubyte':
         cType = 'c_ubyte'
-    elif theTypeStr == 'byte':
+    elif theTypeStrLower == 'byte':
         cType = 'c_byte'
-    elif theTypeStr == 'float':
+    elif theTypeStrLower == 'float':
         cType = 'c_float'
-    elif theTypeStr == 'double':
+    elif theTypeStrLower == 'double':
         cType = 'c_double'
-    elif theTypeStr == 'short':
+    elif theTypeStrLower == 'short':
         cType = 'c_short'
-    elif theTypeStr == 'unsigned short':
+    elif theTypeStrLower == 'unsigned short':
         cType = 'c_ushort'
-    elif theTypeStr == 'size_t':
+    elif theTypeStrLower == 'size_t':
         cType = 'c_size_t'
-    elif theTypeStr == 'ssize_t':
+    elif theTypeStrLower == 'ssize_t':
         cType = 'c_ssize_t'
-    elif theTypeStr == 'long double':
+    elif theTypeStrLower == 'long double':
         cType = 'c_longdouble'
-    elif theTypeStr == 'unsigned char':
+    elif theTypeStrLower == 'unsigned char':
         cType = 'c_ubyte'
+    elif hasattr(ctypes.wintypes, theTypeStr.upper()): # go upper since all winapi types are caps
+        cType = 'wintypes.%s' % theTypeStr
     else:
         # Todo: look for type above this line in the source
-        raise Exception("Unknown type given: %s" % theTypeStr)
+        #raise Exception("Unknown type given: %s" % theTypeStr)
+        cType = theTypeStr
 
     if bitField is not False:
         cType = '%s, %s' % (cType, bitField) 
@@ -153,7 +159,8 @@ def findStructures(fileLocation=None, fileText=None):
     for regex in REGEX_STRUCT_LIST:
         for match in regex.finditer(fileText):
             startIndex = match.start()
-            structName = match.groups()[0].strip()
+            structName = match.groups()[1].strip()
+            structType = match.groups()[0].strip() # union or struct
             structText = ""
             if len(structName) == 0:
                 structName = getAnonName()
@@ -195,28 +202,48 @@ def cStructHeaderToPy(headerLine, nameOverride=None):
     if nameOverride:
         name = nameOverride
     else:
-        name = headerLine.replace('typedef', '').replace("{", "").replace("struct", "").strip()
+        name = headerLine.replace('typedef', '').replace("{", "").replace("struct", "").replace("union", "").strip()
+
+    if 'union' in headerLine and 'struct' in headerLine:
+        raise Exception("Ambiguity detected. Based off the headerLine (%s), can't tell if this is a union or struct... contains both words" % headerLine)
+
+    if 'union' in headerLine:
+        theType = 'Union'
+    elif 'struct' in headerLine:
+        theType = 'Structure'
+    else:
+        raise Exception("Ambiguity detected. Did not find struct or union in the headerLine (%s)" % headerLine)
 
     # TODO : what if it isn't pack 1?
-    headerPy = 'class %s(Structure):\n    _pack_ = 1\n    _fields_ = [\n%%s    ]' % name
+    headerPy = 'class %s(%s):\n    _pack_ = 1\n    _fields_ = [\n%%s    ]\n' % (name, theType)
     return headerPy
 
-def cStructToPy(fileText, aliases, nameOverride=None):
+def cStructToPy(fileText, aliases, nameOverride):
     '''
     Brief:
         Converts the given struct text to a python ctype struct text
-            If nameOverride is given, use this as the name instead of looking in the struct for it
+            Requires nameOverride to give the name of the struct
     '''
     fileTextLines = fileText.replace(';','').splitlines()
     firstLine = fileTextLines[0]
-    lastLine = fileTextLines[-1]
+    lastLine = fileTextLines[-1].replace("}", "")    # '' or 'NAME, *PNAME'
     structFields = map(str.strip, fileTextLines[1:-1])
     cStructText = cStructHeaderToPy(firstLine, nameOverride)
     fieldText = ""
     for fieldLine in structFields:
         fieldText += ' ' * 8 + typeToCtypeLine(fieldLine, aliases) + "\n"
 
-    return cStructText % fieldText
+    fullStructDefinition = cStructText % fieldText
+
+    # Get extra declarations at the end of the struct
+    for extraName in lastLine.split():
+        if extraName == nameOverride:
+            continue # Don't add extra names that match the top name
+        pointerCount = extraName.count('*')
+        extraNameDefinition = (pointerCount * "POINTER(") + nameOverride + (")" * pointerCount)
+        fullStructDefinition += "%s = %s\n" % (extraName, extraNameDefinition)
+
+    return fullStructDefinition
 
 def _getFileText(fileLocation=None, fileText=None):
     '''
