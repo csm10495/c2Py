@@ -12,6 +12,11 @@
     <OutputPath>.</OutputPath>
     <Name>c2Py</Name>
     <RootNamespace>c2Py</RootNamespace>
+    <IsWindowsApplication>False</IsWindowsApplication>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <CommandLineArguments>-f test_header.h -d</CommandLineArguments>
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+    <InterpreterArguments>-i</InterpreterArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -23,6 +28,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="c2Py.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="test_header.h" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
