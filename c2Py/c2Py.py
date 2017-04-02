@@ -166,7 +166,6 @@ def removePreprocessorIfs(fileText, aliases):
     Brief:
         Removes preprocessor directives (#if, #ifdef, #ifndef) from a file along with the associated code.
     '''
-    # TODO
 
     # Switch '!' into 'not '
     fileTextLines = fileText.splitlines()
