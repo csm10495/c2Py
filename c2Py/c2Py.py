@@ -11,6 +11,7 @@ import collections
 import ctypes
 import os
 import re
+import sys
 import time
 
 from pprint import pprint
@@ -137,6 +138,99 @@ def removeComments(fileText):
     # TODO
     return fileText
 
+def removeEmptyLines(fileText):
+    '''
+    Brief:
+        Removes empty lines from text
+    '''
+    # remove empty lines
+    finalLines = []
+    fileTextLines = fileText.splitlines()
+    for i in fileTextLines:
+        if i.strip() != '':
+            finalLines.append(i)
+    return '\n'.join(finalLines)
+
+def _testEvalOr0(text):
+    '''
+    Brief:
+        will attempt to eval the text to give a True/False, if we can't returns False
+    '''
+    try:
+        return bool(eval(text))
+    except:
+        return False
+
+def removePreprocessorIfs(fileText, aliases):
+    '''
+    Brief:
+        Removes preprocessor directives (#if, #ifdef, #ifndef) from a file along with the associated code.
+    '''
+    # TODO
+
+    # Switch '!' into 'not '
+    fileTextLines = fileText.splitlines()
+    # Make directive lines eval-able
+    for idx, line in enumerate(fileTextLines):
+        # possible directive
+        if line.lstrip().startswith("#") and not [i for i in ['#include', '#define', '#undef', '#pragma', '#error', '#endif'] if i in line]:
+            fileTextLines[idx] = line.replace("!", "not ")
+            fileTextLines[idx] = replaceAliases(aliases, fileText=line)
+
+            testLine = replaceAliases({"#if" : "", "#ifdef" :  "", "#ifndef" : ""}, fileText=line).strip()
+            if testLine.startswith("#if "):
+                bool(eval(testLine)) # This is a test to make sure we can eval this line for later.... will fail if we can't evaluate the directive. Only matters for #if
+
+    # Try to remove code that would be removed by directives
+    inFalseDirective = False # In a directive that will make code be removed
+    directiveStartLine = None
+    directiveCount = 0
+    countToLookFor = None
+    for idx, line in enumerate(fileTextLines):
+        line = line.lstrip()
+        if line.startswith("#i"):
+            directiveCount += 1
+        elif line.startswith('#endif'):
+            directiveCount -= 1
+
+        if countToLookFor == directiveCount:
+            # Clear outted lines, reset markers
+            for i in range(directiveStartLine, idx):
+                fileTextLines[i] = "\n"
+            countToLookFor = None
+            directiveStartLine = None
+
+        if line.startswith('#if ') and not inFalseDirective:
+            inFalseDirective = not bool(eval(line.replace("#if", "").strip()))
+        elif line.startswith('#ifdef') or line.startswith("#ifndef") and not inFalseDirective:
+            ifdef = line.startswith("#ifdef") # ifndef is opposite ifdef
+            items = line.replace("#ifdef", "").replace("#ifndef", "").strip().replace("||", " or ").replace("&&", " and ").split()
+            replaceList = {}
+            for i in items:
+                if i in ['or', 'and']:
+                    continue
+                if i in aliases or _testEvalOr0(i):
+                    replaceList[i] = "True"
+                else:
+                    replaceList[i] = "False"
+            evalAbleItems = replaceAliases(replaceList, fileText=' '.join(items))
+            if ifdef:
+                inFalseDirective = not bool(eval(evalAbleItems))
+            else:
+                inFalseDirective = bool(eval(evalAbleItems))
+
+        if inFalseDirective and directiveStartLine is None:
+            countToLookFor = directiveCount - 1
+            directiveStartLine = idx
+
+    for idx, line in enumerate(fileTextLines):
+        line = line.strip()
+        if line.startswith("#i") or line.startswith("#end"):
+            fileTextLines[idx] = ""
+
+    fileText = '\n'.join(fileTextLines)
+    return fileText
+
 def getAnonName():
     '''
     Brief:
@@ -144,7 +238,7 @@ def getAnonName():
     '''
     return '_Anon_%s' % str(time.time()).replace('.', '_')
 
-def findStructures(fileLocation=None, fileText=None):
+def findStructures(aliases, fileLocation=None, fileText=None):
     '''
     Brief:
         Returns a dictionary of name to text for structures directly in the given file or text
@@ -153,6 +247,8 @@ def findStructures(fileLocation=None, fileText=None):
 
     # remove comments
     fileText = removeComments(fileText)
+    fileText = removePreprocessorIfs(fileText, aliases)
+    fileText = removeEmptyLines(fileText)
 
     structuresAsText = {} # Name to implementation
 
@@ -315,8 +411,9 @@ if __name__ == '__main__':
             # Note that I'm not checking for an override here. Overrides are allowed.
             aliases[left] = right
 
-    structuresAsText = findStructures(fileLocation=args.file)
+    structuresAsText = findStructures(fileLocation=args.file, aliases=aliases)
     if not structuresAsText:
+        print ("Found no structures.")
         sys.exit(1)
 
     for key, value in structuresAsText.items():

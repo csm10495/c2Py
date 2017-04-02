@@ -14,10 +14,12 @@ int main()
 	return 1;
 }
 
+#ifndef THING_NOT_DEF
 struct a {
 	CHAR c;
 	BYTE d;
 } ;
+#endif
 
 typedef struct s {
 	byte a[3];
@@ -30,9 +32,11 @@ typedef union u {
 }u;
 
 
+#ifndef MYTYPE
 // TODO move this inside an existing struct to work on nesting
 struct {
 	byte e : BITS_FOR_E;
 	byte f : 8 - BITS_FOR_E;
 	MYTYPE g;
 };
+#endif
