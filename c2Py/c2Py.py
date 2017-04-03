@@ -27,6 +27,9 @@ REGEX_ALIAS_1 = re.compile(r'typedef\s*(.*);')
 REGEX_ALIAS_2 = re.compile(r'#define\s*(.*)')
 REGEX_ALIAS_LIST = [REGEX_ALIAS_1, REGEX_ALIAS_2]
 
+# Used to remove typedef volatile and replace it with just typedef
+REGEX_TYPEDEF_VOLATILE = re.compile('typedef\s+volatile\s+')
+
 def printDict(d):
     '''
     Brief:
@@ -135,8 +138,15 @@ def removeComments(fileText):
     Brief:
         Removes the comments from a file
     '''
-    # TODO
+    # TODO    
     return fileText
+
+def removeTypedefVolatile(fileText):
+    '''
+    Brief:
+        Remove typedef volatile from text and replaces it with just typedef
+    '''
+    return re.sub(REGEX_TYPEDEF_VOLATILE, 'typedef ', fileText)
 
 def removeEmptyLines(fileText):
     '''
@@ -248,6 +258,7 @@ def findStructures(aliases, fileLocation=None, fileText=None):
     fileText = removeComments(fileText)
     fileText = removePreprocessorIfs(fileText, aliases)
     fileText = removeEmptyLines(fileText)
+    fileText = removeTypedefVolatile(fileText)
 
     structuresAsText = {} # Name to implementation
 
