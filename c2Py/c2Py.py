@@ -217,10 +217,11 @@ def removePreprocessorIfs(fileText, aliases):
 
         if countToLookFor == directiveCount:
             # Clear outted lines, reset markers
-            for i in range(directiveStartLine, idx):
+            for i in range(directiveStartLine, idx + 1):
                 fileTextLines[i] = "\n"
             countToLookFor = None
             directiveStartLine = None
+            inFalseDirective = False
 
         if line.startswith('#if ') and not inFalseDirective:
             inFalseDirective = not bool(eval(line.replace("#if", "").strip()))
@@ -240,6 +241,17 @@ def removePreprocessorIfs(fileText, aliases):
                 inFalseDirective = not bool(eval(evalAbleItems))
             else:
                 inFalseDirective = bool(eval(evalAbleItems))
+        elif line.startswith('#else'):
+            if inFalseDirective:
+                testDirectiveCount = directiveCount - 1
+                if testDirectiveCount == countToLookFor:
+                    for i in range(directiveStartLine, idx + 1):
+                        fileTextLines[i] = "\n"
+                    countToLookFor = None
+                    directiveStartLine = None
+                    inFalseDirective = False
+            else:
+                inFalseDirective = True
 
         if inFalseDirective and directiveStartLine is None:
             countToLookFor = directiveCount - 1
@@ -247,7 +259,7 @@ def removePreprocessorIfs(fileText, aliases):
 
     for idx, line in enumerate(fileTextLines):
         line = line.strip()
-        if line.startswith("#i") or line.startswith("#end"):
+        if line.startswith("#i") or line.startswith("#e"):
             fileTextLines[idx] = ""
 
     fileText = '\n'.join(fileTextLines)
