@@ -27,8 +27,8 @@ REGEX_ALIAS_1 = re.compile(r'typedef\s*(.*);')
 REGEX_ALIAS_2 = re.compile(r'#define\s*(.*)')
 REGEX_ALIAS_LIST = [REGEX_ALIAS_1, REGEX_ALIAS_2]
 
-# Used to remove typedef volatile and replace it with just typedef
-REGEX_TYPEDEF_VOLATILE = re.compile('typedef\s+volatile\s+')
+# Used to remove the volatile keyword in general
+REGEX_VOLATILE = re.compile(r'(\s+|^)volatile\s+')
 
 def printDict(d):
     '''
@@ -141,12 +141,25 @@ def removeComments(fileText):
     # TODO    
     return fileText
 
-def removeTypedefVolatile(fileText):
+def removeVolatile(fileText):
     '''
     Brief:
-        Remove typedef volatile from text and replaces it with just typedef
+        Remove useless examples of the volatile keyword
     '''
-    return re.sub(REGEX_TYPEDEF_VOLATILE, 'typedef ', fileText)
+    def qual(m):
+        '''
+        Brief:
+            Inner function to be called for each regex match to know what to do
+
+            if it starts with \n, leave in the pre-whitespace. Otherwise, remove it.
+        '''
+        theMatch = m.group()
+        if theMatch.startswith("\n"):
+            return theMatch.split("volatile")[0]
+        return " "
+
+    fileText = re.sub(REGEX_VOLATILE, qual, fileText)
+    return fileText
 
 def removeEmptyLines(fileText):
     '''
@@ -258,7 +271,7 @@ def findStructures(aliases, fileLocation=None, fileText=None):
     fileText = removeComments(fileText)
     fileText = removePreprocessorIfs(fileText, aliases)
     fileText = removeEmptyLines(fileText)
-    fileText = removeTypedefVolatile(fileText)
+    fileText = removeVolatile(fileText)
 
     structuresAsText = {} # Name to implementation
 
@@ -431,8 +444,3 @@ if __name__ == '__main__':
         print (value)
         print (cStructToPy(fileText=value, nameOverride=key, aliases=aliases))
         print ("-" * 40)
-
-
-
-
-

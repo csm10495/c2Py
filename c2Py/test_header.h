@@ -31,6 +31,10 @@ typedef union u {
 	long b;
 }u;
 
+// Test _volatile
+typedef volatile struct volatileStruct {
+	volatile int volatileInt;
+};
 
 #ifndef MYTYPE
 // TODO move this inside an existing struct to work on nesting
