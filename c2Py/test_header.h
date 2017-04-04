@@ -23,7 +23,8 @@ int main()
 	#endif
 
 	typedef struct s {
-		byte a[3];
+		//Comment to remove.
+		byte a[3]; // Comment to keep
 		unsigned int b : 4;
 	}_s, *Ps;
 

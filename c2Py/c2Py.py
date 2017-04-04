@@ -47,6 +47,7 @@ def typeToCtypeLine(theTypeStr, aliases):
     '''
     theTypeStr = replaceAliases(aliases=aliases, fileText=theTypeStr)
     theTypeStr = theTypeStr.replace(';', '').strip()
+    theTypeStr, comment = removeAndGetLineComment(theTypeStr)
     if ':' in theTypeStr:
         # bitField
         bitField = theTypeStr.split(':')[1].strip()
@@ -131,15 +132,38 @@ def typeToCtypeLine(theTypeStr, aliases):
         cType = '%s * %s' % (cType, array)
 
     fullLine = "('%s', %s)," % (theName, cType)
+
+    # if we have a comment, add it to the Python code
+    if comment:
+        fullLine += " # %s" % comment
+
     return fullLine
 
 def removeComments(fileText):
     '''
     Brief:
-        Removes the comments from a file
+        Removes the single line comments from a file
     '''
-    # TODO    
-    return fileText
+    fileTextLines = fileText.splitlines()
+    for idx, line in enumerate(fileTextLines):
+        # does not call removeAndGetLineComment() since we don't want to remove comments on the end of lines.
+        if line.strip().startswith('//'):
+            fileTextLines[idx] = ''
+
+    return '\n'.join(fileTextLines)
+
+def removeAndGetLineComment(lineText):
+    '''
+    Brief:
+        Returns the line without comments and then the comments
+            String, String
+    '''
+    s = lineText.split("//")
+    if len(s) > 1:
+        comment = s[1].strip()
+        left = s[0]
+        return left, comment
+    return lineText, ""
 
 def removeVolatile(fileText):
     '''
